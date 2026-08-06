@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 런타임 산출물
+*.log
+sequence_output.txt
+
+# 에디터 / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store

@@ -1,0 +1,13 @@
+# Raspberry Pi OS (Bookworm) ships all of these as apt packages:
+#   sudo apt install python3-pyqt5 python3-smbus2 python3-spidev \
+#                    python3-libgpiod python3-lgpio
+PyQt5>=5.15
+smbus2>=0.4
+spidev>=3.5
+
+# GPIO direction / level / bias. libgpiod v2 only: lgpio's v1-uAPI path is
+# rejected by current Pi kernels when requesting BIAS_PULL_UP.
+gpiod>=2.1
+
+# Software PWM (tx_pwm); libgpiod has no equivalent.
+lgpio>=0.2.2
