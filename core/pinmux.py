@@ -27,6 +27,11 @@ I2C1_PINS = {
     3: ("a0", "I2C1 SCL"),
 }
 
+#: Pad default pull per pin. Restored along with the function: a pull left over
+#: from GPIO use survives a mode change, and an idle bus then reads back FF
+#: instead of 00, which misdirects the loopback diagnosis.
+DEFAULT_PULLS = {9: "pd", 10: "pd", 11: "pd", 2: "pu", 3: "pu"}
+
 #: CE0/CE1 are driven as plain outputs because the Pi device tree wires the SPI
 #: chip selects through `cs-gpios`, not the controller's native ALT0 lines.
 SPI0_CS_PINS = {8: ("op", "SPI0 CE0"), 7: ("op", "SPI0 CE1")}
@@ -62,9 +67,13 @@ def get(pins):
     return {bcm: found[bcm] for bcm in pins if bcm in found} or None
 
 
-def set_function(bcm, func):
-    """Force one pin to a function; returns True on success."""
-    return _run(["pinctrl", "set", str(bcm), func]) is not None
+def set_function(bcm, func, pull=None):
+    """Force one pin to a function (and its default pull); True on success."""
+    args = ["pinctrl", "set", str(bcm), func]
+    pull = pull or DEFAULT_PULLS.get(bcm)
+    if pull:
+        args.append(pull)
+    return _run(args) is not None
 
 
 def check(expected):
@@ -97,3 +106,58 @@ def restore(expected, quiet=False):
             log.error(f"{label}(GPIO{bcm})를 '{want}'로 되돌리지 못했습니다 "
                       f"(현재 '{actual}')")
     return repaired
+
+
+def continuity(driver_bcm, sense_bcm, chip_path="/dev/gpiochip0"):
+    """Is `driver_bcm` physically wired to `sense_bcm`? (True / False / None)
+
+    Drives one pin and reads the other with the *opposite* internal bias, twice
+    with the levels swapped. A push-pull output beats the ~50k pull, so a joined
+    pair follows the driver both times while an open pair follows its own pull
+    both times. That distinguishes a missing jumper from a bus misconfiguration,
+    which otherwise look identical: both read back all-zero.
+
+    Steals both pins from whatever owns them, so the caller must restore the
+    pin functions afterwards.
+    """
+    try:
+        import gpiod
+        from gpiod.line import Bias, Direction, Value
+    except ImportError:
+        return None
+
+    import time
+    seen = {}
+    try:
+        for drive in (1, 0):
+            out = gpiod.LineSettings(
+                direction=Direction.OUTPUT,
+                output_value=Value.ACTIVE if drive else Value.INACTIVE)
+            sense = gpiod.LineSettings(
+                direction=Direction.INPUT,
+                bias=Bias.PULL_DOWN if drive else Bias.PULL_UP)
+            with gpiod.request_lines(chip_path, consumer="continuity",
+                                     config={driver_bcm: out}):
+                with gpiod.request_lines(chip_path, consumer="continuity",
+                                         config={sense_bcm: sense}) as reader:
+                    time.sleep(0.02)
+                    seen[drive] = 1 if reader.get_value(sense_bcm) == Value.ACTIVE else 0
+    except (OSError, PermissionError):
+        return None
+    if seen == {1: 1, 0: 0}:
+        return True
+    if seen == {1: 0, 0: 1}:
+        return False
+    return None
+
+
+def normalize(expected, quiet=True):
+    """Force function *and* default pull on every pin, whatever they read now.
+
+    `restore` only touches pins whose function drifted; after a continuity probe
+    the function may be back but the bias left inverted, so the caller that
+    borrowed the pins normalizes unconditionally.
+    """
+    for bcm, (want, label) in expected.items():
+        if not set_function(bcm, want) and not quiet:
+            log.error(f"{label}(GPIO{bcm})를 '{want}'로 되돌리지 못했습니다")

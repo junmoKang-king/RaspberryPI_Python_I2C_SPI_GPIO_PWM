@@ -262,12 +262,22 @@ class SPIBus:
             return (f"핀 먹스가 어긋났습니다 — {names}. "
                     "'핀 기능 확인'으로 되돌린 뒤 다시 시도하세요")
 
-        if not any(rx):
-            return ("RX가 전부 00입니다 — MISO를 구동하는 쪽이 없습니다. "
+        if not any(rx) or all(b == 0xFF for b in rx):
+            # An open jumper and a misconfigured bus both read back flat, so
+            # settle it electrically rather than making the user guess.
+            joined = pinmux.continuity(10, 9)
+            pinmux.normalize(pinmux.SPI0_PINS)
+            if joined is False:
+                return ("19번 핀(MOSI)과 21번 핀(MISO)이 전기적으로 이어져 있지 "
+                        "않습니다. 두 핀은 헤더 안쪽 홀수 열에서 위아래로 붙어 "
+                        "있습니다 — 옆줄(20·22번, 짝수 열)이나 23번(SCLK)에 "
+                        "꽂히지 않았는지 확인하세요")
+            if joined is True:
+                return ("점퍼는 이어져 있는데 데이터가 돌아오지 않습니다 — "
+                        "다른 프로세스가 SPI를 쓰고 있거나 드라이버 설정 문제입니다")
+            flat = "00" if not any(rx) else "FF"
+            return (f"RX가 전부 {flat}입니다 — MISO를 구동하는 쪽이 없습니다. "
                     "점퍼(19↔21) 연결을 확인하세요")
-        if all(b == 0xFF for b in rx):
-            return ("RX가 전부 FF입니다 — MISO에 풀업만 보입니다. "
-                    "점퍼 연결을 확인하세요")
 
         # A slave that fills its TX register from the command's RX interrupt
         # answers exactly one byte late; that is the case the dummy-byte
