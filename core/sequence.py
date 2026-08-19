@@ -82,6 +82,14 @@ def _spi_transfer(ctx, args, length):
     return fmt_bytes(ctx.spi.transfer(data))
 
 
+def _spi_read(ctx, args, length):
+    """Clock the command out, then `length` filler bytes to catch a late reply."""
+    data = parse_bytes(_rest(args, 0))
+    rx = ctx.spi.transfer(data, read_extra=length)
+    reply = rx[len(data):] if data else rx
+    return f"{fmt_bytes(rx[:len(data)])} | 더미 {fmt_bytes(reply)}" if data else fmt_bytes(rx)
+
+
 def _spi_write(ctx, args, length):
     data = parse_bytes(_rest(args, 0))
     if not data:
@@ -201,6 +209,7 @@ MODES = (
     ModeSpec("I2C Reg Read",  "0x48, 0x00",         True,  _i2c_reg_read),
     ModeSpec("I2C Scan",      "(인자 없음)",         False, _i2c_scan),
     ModeSpec("SPI Transfer",  "30 80",              False, _spi_transfer),
+    ModeSpec("SPI Read",      "30 80",              True,  _spi_read),
     ModeSpec("SPI Write",     "30 80",              False, _spi_write),
     ModeSpec("GPIO Mode",     "17, out  /  27, in, up", False, _gpio_mode),
     ModeSpec("GPIO Write",    "17, 1",              False, _gpio_write),

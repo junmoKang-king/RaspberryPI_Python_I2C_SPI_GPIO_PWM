@@ -11,6 +11,7 @@ A pin is only ever owned by one of them — plain I/O pins by gpiod, PWM pins by
 lgpio — so the two never contend for the same line.
 """
 
+from . import pinmux
 from .logbus import log
 from .pinmap import label_for
 
@@ -175,6 +176,7 @@ class GPIOController:
         state = self.pins.pop(bcm, None)
         if state is None:
             return
+        restore_alt = not self.simulated and bcm in pinmux.ALT_PINS
         if not self.simulated:
             if state["mode"] == PWM:
                 self._free_pwm_pin(bcm, quiet)
@@ -186,6 +188,15 @@ class GPIOController:
                     except Exception as exc:
                         if not quiet:
                             raise GPIOError(f"{label_for(bcm)} 해제 실패: {exc}") from exc
+        if restore_alt:
+            # Releasing a line leaves it a plain GPIO; the peripheral that owned
+            # the pin stays silently disconnected until its ALT mode is put back.
+            want, peripheral = pinmux.ALT_PINS[bcm]
+            if pinmux.set_function(bcm, want):
+                log.info(f"{label_for(bcm)}를 {peripheral}({want})로 되돌렸습니다")
+            else:
+                log.warn(f"{label_for(bcm)}를 {peripheral}({want})로 되돌리지 "
+                         f"못했습니다 — 해당 버스가 동작하지 않을 수 있습니다")
         if not quiet:
             log.info(f"{label_for(bcm)} 해제됨")
 

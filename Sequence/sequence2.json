@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "steps": [
+    {
+      "description": "I2C 스캔",
+      "mode": "I2C Scan",
+      "command": "",
+      "read_length": 1,
+      "delay_ms": 10,
+      "repeat": 1,
+      "enabled": false
+    },
+    {
+      "description": "DAC 1.65V",
+      "mode": "DAC Write I2C",
+      "command": "0x62, 2048",
+      "read_length": 1,
+      "delay_ms": 100,
+      "repeat": 1,
+      "enabled": false
+    },
+    {
+      "description": "GPIO17 HIGH",
+      "mode": "GPIO Write",
+      "command": "17, 1",
+      "read_length": 1,
+      "delay_ms": 500,
+      "repeat": 1,
+      "enabled": true
+    },
+    {
+      "description": "GPIO17 LOW",
+      "mode": "GPIO Write",
+      "command": "17, 0",
+      "read_length": 1,
+      "delay_ms": 500,
+      "repeat": 1,
+      "enabled": true
+    },
+    {
+      "description": "PWM 1kHz 50%",
+      "mode": "PWM Start",
+      "command": "12, 1000, 50",
+      "read_length": 1,
+      "delay_ms": 1000,
+      "repeat": 1,
+      "enabled": true
+    },
+    {
+      "description": "PWM 정지",
+      "mode": "PWM Stop",
+      "command": "12",
+      "read_length": 1,
+      "delay_ms": 10,
+      "repeat": 1,
+      "enabled": true
+    },
+    {
+      "description": "",
+      "mode": "I2C Write",
+      "command": "0x6a,00,01",
+      "read_length": 1,
+      "delay_ms": 10,
+      "repeat": 1,
+      "enabled": true
+    }
+  ]
+}
